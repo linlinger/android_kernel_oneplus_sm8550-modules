@@ -135,10 +135,17 @@ static int dsi_pwr_enable_vregs(struct dsi_regulator_info *regs, bool enable)
 	u32 pre_off_ms, post_off_ms;
 #ifdef OPLUS_FEATURE_DISPLAY
 	struct dsi_display *display = get_main_display();
-	if (!display) {
-		DSI_ERR("dsi_pwr_enable_vregs display panel null\n");
-		return -ENODEV;
-	}
+	/*
+	 * AviumUI fix: 恢复 OnePlus 官方行为, 移除对 get_main_display() 的
+	 * NULL 硬检查。在 recovery 等环境下 secondary 面板先于 primary probe,
+	 * primary_display 尚未赋值 (NULL)。官方代码这里取了 display 但不检查,
+	 * 使能 dummy 电源照常继续, 保证 secondary 面板 probe 成功、DRM 设备
+	 * 正常注册。crdroid 加的 `if (!display) return -ENODEV` 会让
+	 * secondary 面板在 recovery 下必然失败 → msm_drm master 不 bind →
+	 * /dev/dri/card0 不存在 → TWRP 黑屏卡死。
+	 */
+	if (!display)
+		DSI_WARN("dsi_pwr_enable_vregs main display not ready, continue with dummy supply\n");
 #endif /* OPLUS_FEATURE_DISPLAY */
 
 	if (enable) {

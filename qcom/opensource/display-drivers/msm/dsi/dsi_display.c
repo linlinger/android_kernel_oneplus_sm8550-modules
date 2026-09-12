@@ -6580,6 +6580,27 @@ int dsi_display_dev_probe(struct platform_device *pdev)
 
 	return 0;
 end:
+#ifdef OPLUS_FEATURE_DISPLAY
+	/*
+	 * primary_display/secondary_display were assigned earlier in this
+	 * function (dsi_display_dev_probe) before dsi_display_validate_res().
+	 * If probe fails here (e.g. -EPROBE_DEFER because the DSI controller
+	 * is not ready yet), the display is freed below but the global
+	 * pointers still reference it, leaving a dangling pointer.
+	 * A subsequent probe of the secondary display calls
+	 * dsi_pwr_enable_vregs() -> get_main_display() which then reads the
+	 * freed memory and fails with -ENODEV, preventing the DRM device from
+	 * registering (no /dev/dri/card0). This breaks display in recovery
+	 * (TWRP cannot open a DRM device -> black screen).
+	 * Clear the global pointers before freeing.
+	 */
+	if (display) {
+		if (primary_display == display)
+			primary_display = NULL;
+		if (secondary_display == display)
+			secondary_display = NULL;
+	}
+#endif /* OPLUS_FEATURE_DISPLAY */
 	if (display)
 		devm_kfree(&pdev->dev, display);
 
