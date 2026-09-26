@@ -135,10 +135,14 @@ static int dsi_pwr_enable_vregs(struct dsi_regulator_info *regs, bool enable)
 	u32 pre_off_ms, post_off_ms;
 #ifdef OPLUS_FEATURE_DISPLAY
 	struct dsi_display *display = get_main_display();
-	if (!display) {
-		DSI_ERR("dsi_pwr_enable_vregs display panel null\n");
-		return -ENODEV;
-	}
+	/*
+	 * AviumUI fix (对齐 ColorOS 行为): 移除 crdroid 加的
+	 * `if (!display) return -ENODEV` 检查。
+	 * recovery 下 secondary 面板先于 primary probe, get_main_display()
+	 * 返回 NULL。ColorOS 无此检查, secondary 照常初始化 → msm_drm
+	 * master bind → /dev/dri/card0 → recovery 有显示。
+	 * crdroid 的检查导致 secondary 失败 → 无 DRM 设备 → rec 黑屏。
+	 */
 #endif /* OPLUS_FEATURE_DISPLAY */
 
 	if (enable) {
@@ -181,7 +185,8 @@ static int dsi_pwr_enable_vregs(struct dsi_regulator_info *regs, bool enable)
 				usleep_range((post_on_ms * 1000),
 						(post_on_ms * 1000) + 10);
 #ifdef OPLUS_FEATURE_DISPLAY
-			oplus_panel_vddr_on(display->panel, vreg->vreg_name);
+			if (display && display->panel)
+				oplus_panel_vddr_on(display->panel, vreg->vreg_name);
 #endif /* OPLUS_FEATURE_DISPLAY */
 		}
 	} else {
@@ -209,7 +214,8 @@ static int dsi_pwr_enable_vregs(struct dsi_regulator_info *regs, bool enable)
 						regs->vregs[i].off_min_voltage,
 						regs->vregs[i].max_voltage);
 #ifdef OPLUS_FEATURE_DISPLAY
-			oplus_panel_vddr_off(display->panel, vreg->vreg_name);
+			if (display && display->panel)
+				oplus_panel_vddr_off(display->panel, vreg->vreg_name);
 #endif /* OPLUS_FEATURE_DISPLAY */
 		}
 	}
